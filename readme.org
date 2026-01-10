@@ -34,11 +34,11 @@ A very, very short list for creating and maintaining a Haskell project.
 - [ ] (optional) read through the [[*extras][extras]] section.
 - [ ] (optional) read through the [[*cabal stanzas][cabal stanzas]] section.
 - [ ] (required) hack happy Haskell for your new pet project.
-- [ ] follow the [[*checklist][checklist]] when you want to tidy up.
+- [ ] follow the [[*release checklist][checklist]] when you want to tidy up.
 
 Welcome to [[*Musings on Haskell2024][Haskell2024]]
 
-* Checklist
+* Release Checklist
 
 - [ ] version bump
 - [ ] ghcup upgrades
@@ -155,7 +155,7 @@ Welcome to [[*Musings on Haskell2024][Haskell2024]]
 - [ ] final check
 
   #+begin_src sh :results output
-  cabal clean && cabal build && cabal-docspec
+  cabal clean && cabal build && cabal run doctests
   #+end_src
 - [ ] hkgr tagdist
 
