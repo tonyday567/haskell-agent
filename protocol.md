@@ -120,7 +120,7 @@ cabal-docspec -m Module.Name      # single module
 
 ## House Style
 
-Recurring patterns across ~37 packages in `~/haskell/`. These are emergent conventions, not rules. Full survey at `~/haskell/SKILL.md`.
+Recurring patterns across ~37 packages in `~/haskell/`. These are emergent conventions, not rules. Full survey at `~/self/buff/haskell-survey.md`.
 
 **Combinators over syntax:**
 - `Data.Bool.bool` over if-then-else
@@ -298,7 +298,7 @@ The single dominant blocker: `tdigest => base <4.22`. Issue: [phadej/haskell-tdi
 
 **harpie replaces numhask-array.** `numhask-array` is gone. `~/haskell/harpie` is the replacement. Bump bounds accordingly.
 
-Full tracking at `~/haskell/haskell-allow-newer.md`.
+Full tracking at `~/self/buff/haskell-allow-newer.md`.
 
 ⬡ dependencies resolved → proceed
 

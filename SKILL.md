@@ -48,7 +48,7 @@ Load this skill when working on any Haskell package under `~/haskell/` — espec
 
 ## Companion files
 
-- `~/haskell/SKILL.md` — haskell-survey: full idiom mining, hardening log, ~37 library surveys
-- `~/haskell/haskell-allow-newer.md` — upstream blocker tracking, repo-by-repo status
+- `~/self/buff/haskell-survey.md` — haskell-survey: full idiom mining, hardening log, ~37 library surveys
+- `~/self/buff/haskell-allow-newer.md` — upstream blocker tracking, repo-by-repo status
 - `~/haskell/circuits/SKILL.md` — circuits-specific agent field guide
 - `~/haskell/circuits-meter/SKILL.md` — perf benchmarking conventions
