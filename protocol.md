@@ -118,6 +118,69 @@ cabal-docspec -m Module.Name      # single module
 
 ---
 
+## House Style
+
+Recurring patterns across ~37 packages in `~/haskell/`. These are emergent conventions, not rules. Full survey at `~/haskell/SKILL.md`.
+
+**Combinators over syntax:**
+- `Data.Bool.bool` over if-then-else
+- `BlockArguments` for cleaner do-style
+- `\case` for total functions on enums
+
+**Names:**
+- Predictable qualified aliases: `Data.Text as Text`, `Data.ByteString as BS`, `Data.Map.Strict as Map`, `Data.Sequence as Seq`
+- `Prelude qualified as P` when replacing Prelude entirely
+- `Union`/`Intersection` newtypes for semigroup choice
+
+**Structure:**
+- Category/Arrow/Profunctor as architecture (circuits, box, mealy, mnet)
+- Data-driven design: strategy as plain data, sum types for policy
+- Pattern synonyms with COMPLETE pragmas for view patterns
+- Newtype wrappers with maximal instances
+
+**Optics & labels:**
+- `optics-core` with `#field` OverloadedLabels syntax
+- Profunctor literacy: `dimap`, `lmap`, `rmap`, `strong`, `choice`
+
+**Display:**
+- `prettyprinter` for rendered output
+- Module identity: non-mechanical openers (epigraphs, laws, diagrams)
+
+**Prelude replacement:** `NoImplicitPrelude` + explicit imports, or `RebindableSyntax` + custom Prelude. Pick one.
+
+**Mealy:** `Data.Mealy` machines are the signal-processing backbone across mealy, chart-svg, semcons, perf.
+
+---
+
+## Build Performance
+
+`cabal build` is the #1 wait-point for agents. Compilation time is a natural bottleneck.
+
+Mitigations:
+- Incremental builds (already default in cabal)
+- Caching strategy in CI/local workflows
+- Parallel compilation flags
+- Consider feature cost vs compile time when designing libraries
+
+---
+
+## Core Library Recipes
+
+Per-library cards as tested recipes. Each card documents one library with import qualifiers, 5-10 essential combinators, common gotchas, and doctest-validated examples.
+
+The workflow:
+1. Start a project — `cabal init`, add dependencies
+2. Open the recipe card — read the import conventions and patterns
+3. Test in a fresh repl — `cabal repl`, import as the card specifies, run examples
+4. Discover friction — existing code clashes with introduced encodings
+5. Resolve immediately — the card shows the right way
+
+Candidate libraries: containers, text, bytestring, profunctors, kan-extensions, aeson, lens, mtl, unordered-containers, vector.
+
+Cards live in `buff/haskell-<library>.md` or as skills.
+
+---
+
 ## Release Protocol
 
 The publishing checklist. Run top to bottom. Each section gates the next.
@@ -191,15 +254,51 @@ cabal outdated
 cabal gen-bounds
 ```
 
-**allow-newer:** When transitive deps have stale bounds after a GHC upgrade, read the *first* rejection (not the last), extract `PACKAGE:LIBRARY`, add to cabal.project:
+**allow-newer:** When transitive deps have stale bounds after a GHC upgrade, read the *first* rejection (not the last), extract `PACKAGE:LIBRARY`, add to cabal.project.
+
+**Canonical minimal block (GHC 9.14).** Most repos only need this:
 
 ```
 allow-newer:
-  package-a:base,
-  package-b:template-haskell
+  tdigest:base
 ```
 
-Keep allow-newer minimal. Track upstream issues. Ask if documentation of tracked issues is warranted.
+The single dominant blocker: `tdigest => base <4.22`. Issue: [phadej/haskell-tdigest#50](https://github.com/phadej/haskell-tdigest/issues/50). When you see `*:base` in allow-newer, it is almost always masking `tdigest:base` — replace the wildcard.
+
+**Ghost pins.** These wildcards were carried across many repos but mask nothing. Test without them:
+
+| Pin | Reality |
+|-----|---------|
+| `*:template-haskell` | No actual template-haskell blockers found |
+| `*:containers` | No actual containers blockers found |
+| `*:bytestring` | No actual bytestring blockers found |
+| `*:transformers` | No actual transformers blockers found |
+| `tree-diff:base` | tree-diff is not a direct dep; transient solver appearance |
+
+**Internal bound rot.** Our own packages accumulate stale upper bounds on GHC 9.14:
+
+| Bound | Fix |
+|-------|-----|
+| `containers <0.8` | bump to `<0.9` |
+| `Cabal-syntax <3.15` | bump to `<3.17` |
+| `ghc <9.10` | bump to `<9.15` |
+| `time <1.15` | bump to `<1.16` |
+
+**Rationalization workflow:**
+
+1. Branch: `git checkout -b allow-newer-fix`
+2. Strip all allow-newer from `cabal.project`
+3. `cabal clean && cabal build`
+4. Read the **first** rejection
+5. Add back the **minimal** specific pin
+6. If "unknown package", add local dep paths
+7. If internal bounds, bump them in `.cabal`
+8. Verify: `cabal build --ghc-options=-Wunused-packages`
+9. Commit
+
+**harpie replaces numhask-array.** `numhask-array` is gone. `~/haskell/harpie` is the replacement. Bump bounds accordingly.
+
+Full tracking at `~/haskell/haskell-allow-newer.md`.
 
 ⬡ dependencies resolved → proceed
 
@@ -421,6 +520,39 @@ cabal repl -b yaya     # for cards that need yaya
 The dependency lives in the command, not in `.cabal`.
 
 Cards live in `examples/` or `buff/`. They are NOT integrated into cabal build stanzas.
+
+---
+
+## Deep Patterns
+
+Cross-library lessons from `~/haskell/`. These aren't conventions — they're structural insights that recur.
+
+### Dual Representations
+
+When a library provides two representations of the same thing (initial and final encoding), know which elimination form goes with which type. `circuits` has `Circuit` (GADT, inspectable) and `Hyper` (final, coinductive). `reify :: Circuit arr t x y -> arr x y` interprets a Circuit. `run :: Hyper a a -> a` ties the self-referential knot. They are not interchangeable — calling `run` on a Circuit is a type error. This is the most common bug in example cards.
+
+General lesson: when there's a dual, name the eliminators distinctly. Don't overload.
+
+### Tensor Awareness
+
+When a type is parametric in its tensor (like `Circuit arr t`), identical constructors mean different things under `(,)` vs `Either`. The compiler won't stop you from using the wrong one — you'll get a puzzling type error deep inside a `Knot` or `reify`. Pin the tensor explicitly with a type annotation.
+
+### Either Convention
+
+`Trace (->) Either` uses `Left` = feedback (continue), `Right` = exit. User-facing code often uses the opposite convention. When a loop behaves strangely — exiting immediately when it should loop, or looping forever — check which branch you're returning. The convention is fixed by the class, not configurable.
+
+### Perf Pattern
+
+For benchmarking compiled Haskell:
+
+1. **Compile, don't interpret.** Repl timing is 10-100x slower and the compilation strategy is different. Always `cabal run` with `-O2`.
+2. **Tight loop.** Measure one thing, many times. Read clock, run action, force NF, read clock. No allocation in the measurement.
+3. **Warmup.** First measurements are cold (L2 miss, GC nursery). Warmup 500-1000 iterations.
+4. **Percentiles, not averages.** Report p50. Averages skewed by GC pauses. The p50 tells you what the hot path actually costs.
+5. **NOINLINE on entry points.** Without it, GHC can inline the entire benchmark loop, constant-fold it, and measure nothing.
+6. **RTS options.** `+RTS -s` for allocation/GC stats. `-A64M` for large allocation area to minimize GC frequency.
+
+Reference: `~/haskell/circuits-meter/SKILL.md`.
 
 ---
 
